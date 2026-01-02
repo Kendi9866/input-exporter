@@ -1,8 +1,25 @@
 import { useState } from "react";
-import { Plus, X } from "lucide-react";
+import { Plus, X, CalendarIcon } from "lucide-react";
+import { format } from "date-fns";
+import { ptBR } from "date-fns/locale";
+
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
+import { Calendar } from "@/components/ui/calendar";
+import { cn } from "@/lib/utils";
 
 interface DataFormProps {
   columns: string[];
@@ -11,17 +28,33 @@ interface DataFormProps {
   onRemoveColumn: (column: string) => void;
 }
 
+// 1. CONFIGURAÇÃO: Colunas que devem ser Dropdowns
+const FIELD_OPTIONS: Record<string, string[]> = {
+  "Tipo": ["Entrada", "Saída"],
+  "Status": ["Pendente", "Pago", "Cancelado"],
+  "Forma de pagamento": ["Dinheiro", "Pix", "Cartão de Crédito", "Boleto"],
+};
+
 const DataForm = ({ columns, onAddRow, onAddColumn, onRemoveColumn }: DataFormProps) => {
   const [formData, setFormData] = useState<Record<string, string>>({});
   const [newColumn, setNewColumn] = useState("");
   const [showAddColumn, setShowAddColumn] = useState(false);
 
+  // Helper para identificar se a coluna é de data (case insensitive)
+  const isDateColumn = (colName: string) => {
+    return colName.toLowerCase().includes("data");
+  };
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (Object.values(formData).some((v) => v.trim())) {
+    if (Object.values(formData).some((v) => v && v.trim())) {
       onAddRow(formData);
       setFormData({});
     }
+  };
+
+  const handleInputChange = (column: string, value: string) => {
+    setFormData((prev) => ({ ...prev, [column]: value }));
   };
 
   const handleAddColumn = () => {
@@ -34,6 +67,7 @@ const DataForm = ({ columns, onAddRow, onAddColumn, onRemoveColumn }: DataFormPr
 
   return (
     <form onSubmit={handleSubmit} className="space-y-6">
+      {/* --- Área de Tags das Colunas --- */}
       <div className="flex flex-wrap gap-2 mb-4">
         {columns.map((column) => (
           <div
@@ -70,12 +104,7 @@ const DataForm = ({ columns, onAddRow, onAddColumn, onRemoveColumn }: DataFormPr
                 }
               }}
             />
-            <Button
-              type="button"
-              size="sm"
-              onClick={handleAddColumn}
-              className="h-8"
-            >
+            <Button type="button" size="sm" onClick={handleAddColumn} className="h-8">
               Adicionar
             </Button>
           </div>
@@ -93,23 +122,91 @@ const DataForm = ({ columns, onAddRow, onAddColumn, onRemoveColumn }: DataFormPr
         )}
       </div>
 
+      {/* --- Grid de Inputs --- */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-        {columns.map((column) => (
-          <div key={column} className="space-y-2">
-            <Label htmlFor={column} className="text-sm font-medium">
-              {column}
-            </Label>
-            <Input
-              id={column}
-              value={formData[column] || ""}
-              onChange={(e) =>
-                setFormData((prev) => ({ ...prev, [column]: e.target.value }))
-              }
-              placeholder={`Digite ${column.toLowerCase()}`}
-              className="transition-shadow focus:shadow-soft"
-            />
-          </div>
-        ))}
+        {columns.map((column) => {
+          
+          // CASO 1: É uma coluna de DATA?
+          if (isDateColumn(column)) {
+            return (
+              <div key={column} className="space-y-2">
+                <Label htmlFor={column} className="text-sm font-medium">{column}</Label>
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <Button
+                      variant={"outline"}
+                      className={cn(
+                        "w-full justify-start text-left font-normal",
+                        !formData[column] && "text-muted-foreground"
+                      )}
+                    >
+                      <CalendarIcon className="mr-2 h-4 w-4" />
+                      {formData[column] ? (
+                        formData[column]
+                      ) : (
+                        <span>Selecione uma data</span>
+                      )}
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-auto p-0" align="start">
+                    <Calendar
+                      mode="single"
+                      locale={ptBR}
+                      selected={undefined} // Não controlamos o objeto Date, apenas a string final
+                      onSelect={(date) => {
+                        if (date) {
+                          // Formata para dd/MM/yyyy ao selecionar
+                          handleInputChange(column, format(date, "dd/MM/yyyy"));
+                        }
+                      }}
+                      initialFocus
+                    />
+                  </PopoverContent>
+                </Popover>
+              </div>
+            );
+          }
+
+          // CASO 2: É uma coluna de SELECT (Lista)?
+          if (FIELD_OPTIONS[column]) {
+            return (
+              <div key={column} className="space-y-2">
+                <Label htmlFor={column} className="text-sm font-medium">{column}</Label>
+                <Select
+                  value={formData[column] || ""}
+                  onValueChange={(val) => handleInputChange(column, val)}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Selecione..." />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {FIELD_OPTIONS[column].map((option) => (
+                      <SelectItem key={option} value={option}>
+                        {option}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            );
+          }
+
+          // CASO 3: Input de Texto Normal
+          return (
+            <div key={column} className="space-y-2">
+              <Label htmlFor={column} className="text-sm font-medium">
+                {column}
+              </Label>
+              <Input
+                id={column}
+                value={formData[column] || ""}
+                onChange={(e) => handleInputChange(column, e.target.value)}
+                placeholder={`Digite ${column.toLowerCase()}`}
+                className="transition-shadow focus:shadow-soft"
+              />
+            </div>
+          );
+        })}
       </div>
 
       <Button

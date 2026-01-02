@@ -10,9 +10,9 @@ import { useToast } from "@/hooks/use-toast";
 
 const Index = () => {
   const { toast } = useToast();
-  const [columns, setColumns] = useState<string[]>(["Nome", "Email", "Telefone"]);
+  const [columns, setColumns] = useState<string[]>(["Data de Lançamento", "Descrição", "Parcela/ano", "Tipo", "Valor", "Forma de pagamento", "Categoria", "Responsavel", "Status"]);
   const [data, setData] = useState<DataRow[]>([]);
-  const [filename, setFilename] = useState("meus_dados");
+  const [filename, setFilename] = useState("relatorio_fluxo_condominio_athenas");
 
   const handleAddColumn = (column: string) => {
     setColumns((prev) => [...prev, column]);
